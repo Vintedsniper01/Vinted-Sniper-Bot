@@ -1,0 +1,39 @@
+name: Vinted Vintage Bot
+
+on:
+  schedule:
+    # Alle 10 Minuten. GitHub garantiert keine exakte Pünktlichkeit,
+    # bei wenig Last kann es leichte Verzögerungen geben - für einen
+    # Preis-Alert unproblematisch.
+    - cron: "*/10 * * * *"
+  workflow_dispatch: # erlaubt manuelles Starten über den "Run workflow"-Button
+
+jobs:
+  check-vinted:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo auschecken
+        uses: actions/checkout@v4
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: Bot ausführen
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python vinted_bot.py
+
+      - name: "seen_items.db" zurück ins Repo committen
+        run: |
+          git config user.name "vinted-bot"
+          git config user.email "vinted-bot@users.noreply.github.com"
+          git add seen_items.db
+          git diff --cached --quiet || git commit -m "Update seen_items.db [skip ci]"
+          git push

@@ -1,1 +1,0 @@
-# Vinted-Sniper-Bot

@@ -64,12 +64,37 @@ ENABLE_AI_PHOTO_CHECK = bool(ANTHROPIC_API_KEY)
 SEARCHES = [
     {
         "query": "Polo Ralph Lauren Big Pony",
-        "max_price": 25,
+        "max_price": 10,
         "exclude": [],
     },
     {
-        "query": "Nike Windbreaker Vintage",
+        "query": "Polo Ralph Lauren Crest",
+        "max_price": 10,
+        "exclude": [],
+    },
+    {
+        "query": "Ralph Lauren Cookie Patch",
         "max_price": 20,
+        "exclude": [],
+    },
+    {
+        "query": "Ralph Lauren Gold Crest",
+        "max_price": 15,
+        "exclude": [],
+    },
+    {
+        "query": "Ralph Lauren Gold Monogram",
+        "max_price": 15,
+        "exclude": [],
+    },
+    {
+        "query": "Ralph Lauren Varsity Gold",
+        "max_price": 15,
+        "exclude": [],
+    },
+    {
+        "query": "Ralph Lauren Big Pony Flagge",
+        "max_price": 12,
         "exclude": [],
     },
     # Weitere Suchen hier einfach ergänzen:
@@ -78,7 +103,8 @@ SEARCHES = [
 
 DB_PATH = Path(__file__).parent / "seen_items.db"
 
-VINTED_SEARCH_URL = "https://www.vinted.de/api/v2/catalog/items"
+VINTED_BASE_URL = "https://www.vinted.de"
+VINTED_SEARCH_URL = f"{VINTED_BASE_URL}/api/v2/catalog/items"
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -86,6 +112,20 @@ HEADERS = {
     ),
     "Accept": "application/json",
 }
+
+# Eine Session hält Cookies über mehrere Requests hinweg - Vinted
+# verlangt gültige Session-Cookies, bevor die API-Endpunkte antworten.
+_session = requests.Session()
+_session.headers.update(HEADERS)
+
+
+def _ensure_session():
+    """Besucht einmalig die normale Vinted-Startseite, damit die Session
+    gültige Cookies bekommt. Ohne das antwortet die API mit 404/401."""
+    try:
+        _session.get(VINTED_BASE_URL, timeout=15)
+    except requests.RequestException as e:
+        print(f"[Warnung] Konnte Vinted-Startseite nicht laden: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +166,7 @@ def search_vinted(query, max_price):
         "per_page": 20,
     }
     try:
-        resp = requests.get(VINTED_SEARCH_URL, params=params, headers=HEADERS, timeout=15)
+        resp = _session.get(VINTED_SEARCH_URL, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
         return data.get("items", [])
@@ -245,15 +285,12 @@ def send_telegram_alert(item):
 
 
 # ---------------------------------------------------------------------------
-# HAUPTSCHLEIFE
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
 # HAUPTLAUF (ein Durchlauf pro Aufruf - GitHub Actions übernimmt den Zeitplan)
 # ---------------------------------------------------------------------------
 
 def run():
     conn = init_db()
+    _ensure_session()
     print("Vinted-Bot: Durchlauf gestartet.")
 
     for search in SEARCHES:
